@@ -268,7 +268,7 @@ wss.on('connection', function (ws, req) {
 				var args=message.slice(1).split(" ");
 				switch(args[0]){
 					case "help":
-						ws.send("^Commands: /help /list /username /turns");
+						ws.send("^Commands: /help /list /username /nick /turns");
 						break;
 					case "list":
 						ws.send("^Users: "+Object.values(unames).join(" "));
@@ -277,8 +277,9 @@ wss.on('connection', function (ws, req) {
 						ws.send("^Turns: "+turns.map(x=>unames[x]).join(", "));
 						break;
 					case "username":
+					case "nick":
 						if(args.length<2||args[1].trim().replace(/[^A-Za-z0-9_-]/g,"")==""){
-							ws.send("^Usage: /username <new>");
+							ws.send("^Usage: /"+args[0]+" <new>");
 						}else{
 							var oldname=unames[connectionId],
 								newname=args[1].slice(0,25).replace(/[^A-Za-z0-9_-]/g,"");
