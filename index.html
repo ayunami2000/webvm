@@ -721,7 +721,7 @@
             }
               var tmpimg=new Image();
             tmpimg.onload=function(){ctx.drawImage(this,jsonMsg[0],jsonMsg[1]);};
-            tmpimg.src="data:image/png;base64,"+jsonMsg[2];
+            tmpimg.src="data:image/jpeg;base64,"+jsonMsg[2];
           }catch(L){
               if(e.data.startsWith("$")){
                 username=e.data.slice(1);
@@ -827,26 +827,28 @@
       vm.onmousedown=function(e){
         e.preventDefault();
         mousebtn|=1<<(e.which-1);
+        if(turnmode!=1)return;
         var mousepos=mlock?[e.movementX,e.movementY]:calcMousePos(e);
         x=mousepos[0];
         y=mousepos[1];
-        if(turnmode==1)socket.send(JSON.stringify({x:x,y:y,button:mousebtn,keydown:null,keyup:null,lock:mlock}));
+        socket.send(JSON.stringify({x:x,y:y,button:mousebtn,keydown:null,keyup:null,lock:mlock}));
       };
       vm.onmouseup=function(e){
         e.preventDefault();
-        if(turnmode==0)return turn(1);
         mousebtn&=~(1<<(e.which-1));
+        if(turnmode!=1)return turn(1);
         var mousepos=mlock?[e.movementX,e.movementY]:calcMousePos(e);
         x=mousepos[0];
         y=mousepos[1];
-        if(turnmode==1)socket.send(JSON.stringify({x:x,y:y,button:mousebtn,keydown:null,keyup:null,lock:mlock}));
+        socket.send(JSON.stringify({x:x,y:y,button:mousebtn,keydown:null,keyup:null,lock:mlock}));
       };
       vm.onmousemove=function(e){
         e.preventDefault();
+        if(turnmode!=1)return;
         var mousepos=mlock?[e.movementX,e.movementY]:calcMousePos(e);
         x=mousepos[0];
         y=mousepos[1];
-        if(turnmode==1)sendMouseMovement=true;
+        sendMouseMovement=true;
       };
       vm.onkeydown=typebox.onkeydown=function(e){
         e.preventDefault();
