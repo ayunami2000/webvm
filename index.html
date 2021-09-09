@@ -103,7 +103,8 @@
   	<button id="fullscreen" onclick="fs()">fullscreen</button>
   	<button id="lockfs" onclick="lockfs()">lock+fs</button>
   	<button id="mutechat" onclick="mutechat()">mute chat</button>
-    <textarea placeholder="mobile users type here" oninput="this.innerText='';"></textarea>
+  	<!--removing attribution breaks license terms-->
+    <textarea placeholder="using webvm by ayunami2000" oninput="this.innerText='';"></textarea>
   	<pre></pre>
   	<input type="text" placeholder="(loading...)" maxlength="250" onkeydown="if([event.key,event.code].includes('Enter'))sendMsg();"/>
   	<audio src="/chat.mp3" preload="auto"></audio>
