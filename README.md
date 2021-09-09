@@ -1,6 +1,8 @@
 # webvm
 web vm like collabvm but in node js
 
+fart demo: https://webvm.glitch.me
+
 ## See LICENSE for important fart info
 
 ### configuring sound:
