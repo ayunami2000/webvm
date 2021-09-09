@@ -14,7 +14,8 @@ var recentips=[];
 var turns=[];
 
 var fps=20,
-	mousefps=10;
+	mousefps=10,
+	imgq={quality:0.25,progressive:true,chromaSubsampling:true};
 
 var updloop=-1;
 
@@ -128,7 +129,7 @@ r.on('rect', function(rect) {
 	cropcanvas.width-=sides[3]+sides[1];
 	cropcanvas.height-=sides[0]+sides[2];
 	cropctx.drawImage(canvas,rect.x,rect.y,rect.width,rect.height,-sides[3],-sides[0],cropcanvas.width+sides[3]+sides[1],cropcanvas.height+sides[0]+sides[2]);
-	var cropbuffer=cropcanvas.toBuffer("image/png");
+	var cropbuffer=cropcanvas.toBuffer("image/jpeg",imgq);
 	wss.clients.forEach(c=>c.send(JSON.stringify([rect.x+sides[3],rect.y+sides[0],cropbuffer.toString("base64"),r.width,r.height])));
   }
 });
@@ -164,7 +165,7 @@ function updchat(msg,silent){
 }
 
 //every 10s update whole screen
-setInterval(()=>wss.clients.forEach(c=>c.send(JSON.stringify([0,0,canvas.toBuffer("image/png").toString("base64"),r.width,r.height]))),10000);
+setInterval(()=>wss.clients.forEach(c=>c.send(JSON.stringify([0,0,canvas.toBuffer("image/jpeg",imgq).toString("base64"),r.width,r.height]))),10000);
 
 var turntimer=20,
 	firstturn=null,
@@ -231,7 +232,7 @@ wss.on('connection', function (ws, req) {
 	ws.send("`"+chatlog.join("\n"));
 
 	//update screen
-	ws.send(JSON.stringify([0,0,canvas.toBuffer("image/png").toString("base64"),r.width,r.height]));
+	ws.send(JSON.stringify([0,0,canvas.toBuffer("image/jpeg",imgq).toString("base64"),r.width,r.height]));
 
 	//control stuff
 	ws.on('message', function (message) {
