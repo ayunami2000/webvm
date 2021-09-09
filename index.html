@@ -34,50 +34,50 @@
         word-wrap:break-word;
         outline:1px solid black;
         overflow-y:scroll;
-          top:0;
-          right:0;
-          bottom:calc(50% + 2em);
-          width:25%;
-          height:calc(50% - 2em);
+        top:0;
+        right:0;
+        bottom:calc(50% + 2em);
+        width:25%;
+        height:calc(50% - 2em);
       }
       input[type=text]{
-          bottom:50%;
-          right:0;
-          width:25vw;
+        bottom:50%;
+        right:0;
+        width:25vw;
       }
       textarea,input[type=text],button,pre{
-          background-color:#ccc;
-          color:#333;
-          border:1px solid #888;
+        background-color:#ccc;
+        color:#333;
+        border:1px solid #888;
       }
       textarea{
-          bottom:0;
-          right:0;
-          resize:none;
-          width:5rem;
-          height:3rem;
-          font-size:0.6em;
+        bottom:0;
+        right:0;
+        resize:none;
+        width:5rem;
+        height:3rem;
+        font-size:0.6em;
       }
       button{
-          right:0;
+        right:0;
       }
       #plock{
-          bottom:5.25em;
+        bottom:5.25em;
       }
       #mute{
-          bottom:6.75em;
+        bottom:6.75em;
       }
       #turn{
-          bottom:8.25em;
+        bottom:8.25em;
       }
       #fullscreen{
-          bottom:9.75em;
+        bottom:9.75em;
       }
       #lockfs{
-          bottom:11.25em;
+        bottom:11.25em;
       }
       #mutechat{
-          bottom:12.75em;
+        bottom:12.75em;
       }
       @media screen and (orientation: portrait){
         canvas{
@@ -86,34 +86,34 @@
         }
         pre{
           top:75%;
-            bottom:2em;
-            left:0;
-            right:25%;
-            width:75%;
-            height:calc(25% - 2em);
+          bottom:2em;
+          left:0;
+          right:25%;
+          width:75%;
+          height:calc(25% - 2em);
         }
         input[type=text]{
-            bottom:0;
-            left:0;
-            width:75%;
-            right:25%;
+          bottom:0;
+          left:0;
+          width:75%;
+          right:25%;
         }
       }
     </style>
   </head>
   <body>
-      <canvas tabindex="-1"></canvas>
-      <button id="plock" onmouseup="event.preventDefault();pointerlock(0)" ontouchend="if(event.touches.length==0){event.preventDefault();pointerlock(1)}">pointer lock</button>
-      <button id="mute" onclick="mute()">mute vm</button>
-      <button id="turn" onclick="turn()">take turn</button>
-      <button id="fullscreen" onclick="fs()">fullscreen</button>
-      <button id="lockfs" onclick="lockfs()">lock+fs</button>
-      <button id="mutechat" onclick="mutechat()">mute chat</button>
-      <!--removing attribution breaks license terms-->
+    <canvas tabindex="-1"></canvas>
+    <button id="plock" onmouseup="event.preventDefault();pointerlock(0)" ontouchend="if(event.touches.length==0){event.preventDefault();pointerlock(1)}">pointer lock</button>
+    <button id="mute" onclick="mute()">mute vm</button>
+    <button id="turn" onclick="turn()">take turn</button>
+    <button id="fullscreen" onclick="fs()">fullscreen</button>
+    <button id="lockfs" onclick="lockfs()">lock+fs</button>
+    <button id="mutechat" onclick="mutechat()">mute chat</button>
+    <!--removing attribution breaks license terms-->
     <textarea placeholder="using webvm by ayunami2000 (mobile users type here)" oninput="this.innerText='';"></textarea>
-      <pre></pre>
-      <input type="text" placeholder="(loading...)" maxlength="250" onkeydown="if([event.key,event.code].includes('Enter'))sendMsg();"/>
-      <audio src="/chat.mp3" preload="auto"></audio>
+    <pre></pre>
+    <input type="text" placeholder="(loading...)" maxlength="250" onkeydown="if([event.key,event.code].includes('Enter'))sendMsg();"/>
+    <audio src="/chat.mp3" preload="auto"></audio>
   </body>
   <script src="/pcm-player.min.js"></script>
   <script>
