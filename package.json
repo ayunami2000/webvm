@@ -1,0 +1,19 @@
+{
+  "name": "webvm",
+  "version": "0.0.1",
+  "description": "",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "audify": "^1.6.3",
+    "canvas": "^2.8.0",
+    "pixelmatch": "^5.2.1",
+    "rfb2": "^0.2.2",
+    "ws": "^8.2.1"
+  },
+  "engines": {
+    "node": "14.x"
+  }
+}

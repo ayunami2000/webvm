@@ -1,0 +1,798 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>webvm</title>
+    <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+    <meta charset="utf8"/>
+    <style>
+    @import url('https://fonts.googleapis.com/css?family=Josefin+Sans|Varela');
+	body,html{background-color:#333;}
+	*:not(input):not(textarea):not(button){color:#ccc;text-shadow:0 0 .25em black;}
+	*:not(canvas){border-radius:.5rem;font-family:"Varela","Josefin Sans",sans-serif;}
+      *{
+        padding:0;
+        margin:0;
+        overflow:hidden;
+      }
+      body{
+        background-color:white;
+      }
+      canvas{
+        position:fixed;
+        top:0;
+        left:0;
+        max-width:70vw;
+        max-height:100vh;
+        z-index:999999;
+      }
+      pre{
+        white-space:pre-wrap;
+        word-wrap:break-word;
+        outline:1px solid black;
+        overflow-y:scroll;
+      	position:fixed;
+      	top:0;
+      	right:0;
+      	bottom:calc(50% + 2em);
+      	width:25vw;
+      	height:calc(50% - 2em);
+      }
+      input[type=text]{
+      	position:fixed;
+      	bottom:50%;
+      	right:0;
+      	width:25vw;
+      }
+      textarea{
+      	position:fixed;
+      	bottom:0;
+      	right:0;
+      	resize:none;
+      	width:4em;
+      	height:4em;
+      }
+      button{
+      	position:fixed;
+      	right:0;
+      }
+      #plock{
+      	bottom:5.25em;
+      }
+      #mute{
+      	bottom:6.75em;
+      }
+      #turn{
+      	bottom:8.25em;
+      }
+      #fullscreen{
+      	bottom:9.75em;
+      }
+      #lockfs{
+      	bottom:11.25em;
+      }
+      #mutechat{
+      	bottom:12.75em;
+      }
+      @media screen and (orientation: portrait){
+        canvas{
+          max-width:100vw;
+          max-height:70vh;
+        }
+        pre{
+          top:75vh;
+      	  bottom:2em;
+      	  left:0;
+      	  right:25%;
+      	  width:75%;
+      	  height:25vh;
+        }
+        input[type=text]{
+      	  bottom:0;
+      	  left:0;
+      	  width:75%;
+      	  right:25%;
+        }
+      }
+    </style>
+  </head>
+  <body>
+  	<canvas tabindex="-1"></canvas>
+  	<button id="plock" onclick="pointerlock()">pointer lock</button>
+  	<button id="mute" onclick="mute()">mute vm</button>
+  	<button id="turn" onclick="turn()">take turn</button>
+  	<button id="fullscreen" onclick="fs()">fullscreen</button>
+  	<button id="lockfs" onclick="lockfs()">lock+fs</button>
+  	<button id="mutechat" onclick="mutechat()">mute chat</button>
+    <textarea placeholder="mobile users type here" oninput="this.innerText='';"></textarea>
+  	<pre></pre>
+  	<input type="text" placeholder="(loading...)" maxlength="250" onkeydown="if([event.key,event.code].includes('Enter'))sendMsg();"/>
+  	<audio src="/chat.mp3" preload="auto"></audio>
+  </body>
+  <script src="/pcm-player.min.js"></script>
+  <script>
+    var vm=document.querySelector("canvas"),
+        ctx=vm.getContext("2d"),
+        typebox=document.querySelector("textarea"),
+        chatbox=document.querySelector("pre"),
+        chatmsg=document.querySelector("input[type=text]"),
+        mutebtn=document.getElementById("mute"),
+        mutechatbtn=document.getElementById("mutechat"),
+        turnbtn=document.getElementById("turn"),
+        msgtosend="",
+        mlock=false,
+        chatsound=document.querySelector("audio"),
+        muted=false,
+        mutedchat=false,
+        turnmode=0;
+
+    window.requestPointerLock=window.requestPointerLock||window.mozRequestPointerLock;
+    document.exitPointerLock=document.exitPointerLock||document.mozExitPointerLock;
+
+	function lockChangeAlert(){
+		mlock=document.pointerLockElement==vm||document.mozPointerLockElement==vm;
+	}
+
+	if ("onpointerlockchange" in document) {
+	  document.addEventListener('pointerlockchange', lockChangeAlert, false);
+	} else if ("onmozpointerlockchange" in document) {
+	  document.addEventListener('mozpointerlockchange', lockChangeAlert, false);
+	}
+
+	function lockfs(){
+		fs();
+		var fstmr=setInterval(()=>{
+			if(document.fullscreenElement!=null){
+				clearInterval(fstmr);
+				pointerlock();
+			}
+		},100);
+		setTimeout(()=>clearInterval(fstmr),2000);
+	}
+
+	function fs(){
+		if(vm.requestFullscreen){
+			vm.requestFullscreen();
+		}else if(vm.mozRequestFullScreen){
+			vm.mozRequestFullScreen();
+		}else if(vm.webkitRequestFullscreen){
+			vm.webkitRequestFullscreen();
+		}else if(vm.msRequestFullscreen){
+			element.msRequestFullscreen();
+		}
+	}
+
+    function mute(){
+    	muted=!muted;
+    	mutebtn.innerText=(muted?"un":"")+"mute vm";
+    }
+
+    function mutechat(){
+    	mutedchat=!mutedchat;
+    	mutechatbtn.innerText=(mutedchat?"un":"")+"mute chat";
+    }
+
+    function pointerlock(){
+    	if(document.pointerLockElement==vm||document.mozPointerLockElement==vm){
+    		document.exitPointerLock();
+    	}else{
+    		vm.requestPointerLock();
+    		vm.focus();
+    	}
+    }
+    window.onmouseover=function(e){if(e.target==vm)vm.focus();};
+
+	function sendMsg(){
+		msgtosend=chatmsg.value;
+		chatmsg.value="";
+	}
+
+	var keyMap = [
+	  [8,   0xff08, 0xff08], // bs
+	  [9,   0xff09, 0xff09], // tab
+	  [13,  0xff0d, 0xff0d], // ent
+	  [16,  0xffe1, 0xffe1], // shift (left)
+	  [16,  0xffe2, 0xffe2], // shift (right) warning: jquery returns 16 for both!
+	  [17,  0xffe3, 0xffe3], // ctrl (left)
+	  [17,  0xffe4, 0xffe4], // ctrl (right) warning: jquery returns 17 for both!
+	  [18,  0xffe9, 0xffe9], // alt (left)
+	  [18,  0xffea, 0xffea], // alt (right) warning: jquery returns 18 for both!
+	  [27,  0xff1b, 0xff1b], // esc
+	  [32,  32,     32    ], // spc
+	  [33,  0xff55, 0xff55], // pgup
+	  [34,  0xff56, 0xff56], // pgdn
+	  [35,  0xff57, 0xff57], // end
+	  [36,  0xff50, 0xff50], // home
+	  [37,  0xff51, 0xff51], // left
+	  [38,  0xff52, 0xff52], // up
+	  [39,  0xff53, 0xff53], // right
+	  [40,  0xff54, 0xff54], // down
+	  [45,  0xff63, 0xff63], // ins
+	  [46,  0xffff, 0xffff], // del
+	  [48,  48,     41    ], // 0
+	  [49,  49,     33    ], // 1
+	  [50,  50,     64    ], // 2
+	  [51,  51,     35    ], // 3
+	  [52,  52,     36    ], // 4
+	  [53,  53,     37    ], // 5
+	  [54,  54,     94    ], // 6
+	  [55,  55,     38    ], // 7
+	  [56,  56,     42    ], // 8
+	  [57,  57,     40    ], // 9
+	  [65,  97,     65    ], // A
+	  [66,  98,     66    ], // B
+	  [67,  99,     67    ], // C
+	  [68,  100,    68    ], // D
+	  [69,  101,    69    ], // E
+	  [70,  102,    70    ], // F
+	  [71,  103,    71    ], // G
+	  [72,  104,    72    ], // H
+	  [73,  105,    73    ], // I
+	  [74,  106,    74    ], // J
+	  [75,  107,    75    ], // K
+	  [76,  108,    76    ], // L
+	  [77,  109,    77    ], // M
+	  [78,  110,    78    ], // N
+	  [79,  111,    79    ], // O
+	  [80,  112,    80    ], // P
+	  [81,  113,    81    ], // Q
+	  [82,  114,    82    ], // R
+	  [83,  115,    83    ], // S
+	  [84,  116,    84    ], // T
+	  [85,  117,    85    ], // U
+	  [86,  118,    86    ], // V
+	  [87,  119,    87    ], // W
+	  [88,  120,    88    ], // X
+	  [89,  121,    89    ], // Y
+	  [90,  122,    90    ], // Z
+	  [97,  49,     49    ], // 1 (keypad)
+	  [98,  50,     50    ], // 2 (keypad)
+	  [99,  51,     51    ], // 3 (keypad)
+	  [100, 52,     52    ], // 4 (keypad)
+	  [101, 53,     53    ], // 5 (keypad)
+	  [102, 54,     54    ], // 6 (keypad)
+	  [103, 55,     55    ], // 7 (keypad)
+	  [104, 56,     56    ], // 8 (keypad)
+	  [105, 57,     57    ], // 9 (keypad)
+	  [106, 42,     42    ], // * (keypad)
+	  [107, 61,     61    ], // + (keypad)
+	  [109, 45,     45    ], // - (keypad)
+	  [110, 46,     46    ], // . (keypad)
+	  [111, 47,     47    ], // / (keypad)
+	  [112, 0xffbe, 0xffbe], // f1
+	  [113, 0xffbf, 0xffbf], // f2
+	  [114, 0xffc0, 0xffc0], // f3
+	  [115, 0xffc1, 0xffc1], // f4
+	  [116, 0xffc2, 0xffc2], // f5
+	  [117, 0xffc3, 0xffc3], // f6
+	  [118, 0xffc4, 0xffc4], // f7
+	  [119, 0xffc5, 0xffc5], // f8
+	  [120, 0xffc6, 0xffc6], // f9
+	  [121, 0xffc7, 0xffc7], // f10
+	  [122, 0xffc8, 0xffc8], // f11
+	  [123, 0xffc9, 0xffc9], // f12
+	  [186, 59,     58    ], // ;
+	  [187, 61,     43    ], // =
+	  [188, 44,     60    ], // ,
+	  [189, 45,     95    ], // -
+	  [190, 46,     62    ], // .
+	  [191, 47,     63    ], // /
+	  [192, 96,     126   ], // `
+	  [220, 92,     124   ], // \
+	  [221, 93,     125   ], // ]
+	  [222, 39,     34    ], // '
+	  [219, 91,     123   ]  // [
+
+	  // non-handleable keys:
+	  // 19  - ?????? - break       (no corresponding rfb code)
+	  // 44  - ?????? - printscreen (no corresponding rfb code)
+	  // 99  - ?????? - unknown     (fn-break on my keyboard)
+	  // 144 - ?????? - numlock     (no corresponding rfb code)
+	  // 145 - ?????? - scrolllock  (no corresponding rfb code)
+	  // ??? - 0xffe7 - meta-left   (jquery does not capture)
+	  // ??? - 0xffe8 - meta-right  (jquery does not capture)
+	];
+	var keyMapTwo = {
+	8: [
+	  65288,
+	  65288
+	],
+	9: [
+	  65289,
+	  65289
+	],
+	13: [
+	  65293,
+	  65293
+	],
+	16: [
+	  65506,
+	  65506
+	],
+	17: [
+	  65508,
+	  65508
+	],
+	18: [
+	  65514,
+	  65514
+	],
+	27: [
+	  65307,
+	  65307
+	],
+	32: [
+	  32,
+	  32
+	],
+	33: [
+	  65365,
+	  65365
+	],
+	34: [
+	  65366,
+	  65366
+	],
+	35: [
+	  65367,
+	  65367
+	],
+	36: [
+	  65360,
+	  65360
+	],
+	37: [
+	  65361,
+	  65361
+	],
+	38: [
+	  65362,
+	  65362
+	],
+	39: [
+	  65363,
+	  65363
+	],
+	40: [
+	  65364,
+	  65364
+	],
+	45: [
+	  65379,
+	  65379
+	],
+	46: [
+	  65535,
+	  65535
+	],
+	48: [
+	  48,
+	  41
+	],
+	49: [
+	  49,
+	  33
+	],
+	50: [
+	  50,
+	  64
+	],
+	51: [
+	  51,
+	  35
+	],
+	52: [
+	  52,
+	  36
+	],
+	53: [
+	  53,
+	  37
+	],
+	54: [
+	  54,
+	  94
+	],
+	55: [
+	  55,
+	  38
+	],
+	56: [
+	  56,
+	  42
+	],
+	57: [
+	  57,
+	  40
+	],
+	65: [
+	  97,
+	  65
+	],
+	66: [
+	  98,
+	  66
+	],
+	67: [
+	  99,
+	  67
+	],
+	68: [
+	  100,
+	  68
+	],
+	69: [
+	  101,
+	  69
+	],
+	70: [
+	  102,
+	  70
+	],
+	71: [
+	  103,
+	  71
+	],
+	72: [
+	  104,
+	  72
+	],
+	73: [
+	  105,
+	  73
+	],
+	74: [
+	  106,
+	  74
+	],
+	75: [
+	  107,
+	  75
+	],
+	76: [
+	  108,
+	  76
+	],
+	77: [
+	  109,
+	  77
+	],
+	78: [
+	  110,
+	  78
+	],
+	79: [
+	  111,
+	  79
+	],
+	80: [
+	  112,
+	  80
+	],
+	81: [
+	  113,
+	  81
+	],
+	82: [
+	  114,
+	  82
+	],
+	83: [
+	  115,
+	  83
+	],
+	84: [
+	  116,
+	  84
+	],
+	85: [
+	  117,
+	  85
+	],
+	86: [
+	  118,
+	  86
+	],
+	87: [
+	  119,
+	  87
+	],
+	88: [
+	  120,
+	  88
+	],
+	89: [
+	  121,
+	  89
+	],
+	90: [
+	  122,
+	  90
+	],
+	97: [
+	  49,
+	  49
+	],
+	98: [
+	  50,
+	  50
+	],
+	99: [
+	  51,
+	  51
+	],
+	100: [
+	  52,
+	  52
+	],
+	101: [
+	  53,
+	  53
+	],
+	102: [
+	  54,
+	  54
+	],
+	103: [
+	  55,
+	  55
+	],
+	104: [
+	  56,
+	  56
+	],
+	105: [
+	  57,
+	  57
+	],
+	106: [
+	  42,
+	  42
+	],
+	107: [
+	  61,
+	  61
+	],
+	109: [
+	  45,
+	  45
+	],
+	110: [
+	  46,
+	  46
+	],
+	111: [
+	  47,
+	  47
+	],
+	112: [
+	  65470,
+	  65470
+	],
+	113: [
+	  65471,
+	  65471
+	],
+	114: [
+	  65472,
+	  65472
+	],
+	115: [
+	  65473,
+	  65473
+	],
+	116: [
+	  65474,
+	  65474
+	],
+	117: [
+	  65475,
+	  65475
+	],
+	118: [
+	  65476,
+	  65476
+	],
+	119: [
+	  65477,
+	  65477
+	],
+	120: [
+	  65478,
+	  65478
+	],
+	121: [
+	  65479,
+	  65479
+	],
+	122: [
+	  65480,
+	  65480
+	],
+	123: [
+	  65481,
+	  65481
+	],
+	186: [
+	  59,
+	  58
+	],
+	187: [
+	  61,
+	  43
+	],
+	188: [
+	  44,
+	  60
+	],
+	189: [
+	  45,
+	  95
+	],
+	190: [
+	  46,
+	  62
+	],
+	191: [
+	  47,
+	  63
+	],
+	192: [
+	  96,
+	  126
+	],
+	219: [
+	  91,
+	  123
+	],
+	220: [
+	  92,
+	  124
+	],
+	221: [
+	  93,
+	  125
+	],
+	222: [
+	  39,
+	  34
+	]
+	};
+
+	function toRfbKeycode(code, shift) {
+		for (var i=0, m=keyMap.length; i<m; i++) {
+		  if (code == keyMap[i][0]) {
+			return keyMap[i][shift ? 2 : 1];
+		  }
+		}
+		return null;
+	};
+	function mapKeys(code,shift){
+		var keys=keyMapTwo[code];
+		keys=keys?keys[shift?1:0]:null;
+		return keys==null?toRfbKeycode(code,shift):keys;
+	}
+
+    var socket = new WebSocket('ws'+window.location.origin.slice(4));
+    socket.binaryType = 'arraybuffer';
+    socket.onopen=()=>{
+      var mousebtn=0,
+          x=-1,
+          y=-1,
+          sendMouseMovement=false,
+          username="loading...",
+          turntimer=20,
+          player=null;
+	  window.onclick=function(){
+		window.onclick=function(){};
+		player=new PCMPlayer({
+			encoding:'16bitInt',
+			channels:2,
+			sampleRate:22050,
+			flushingTime:0
+		});
+      };
+      socket.onmessage=e=>{
+        if(typeof e.data=="string"){
+          try{
+            var jsonMsg=JSON.parse(e.data);
+			if(vm.width!=jsonMsg[3]||vm.height!=jsonMsg[4]){
+			  var cdata=ctx.getImageData(0,0,vm.width,vm.height);
+			  vm.width=jsonMsg[3];
+			  vm.height=jsonMsg[4];
+			  ctx.putImageData(cdata,0,0);
+			}
+      		var tmpimg=new Image();
+			tmpimg.onload=function(){ctx.drawImage(this,jsonMsg[0],jsonMsg[1]);};
+			tmpimg.src="data:image/png;base64,"+jsonMsg[2];
+          }catch(L){
+          	if(e.data.startsWith("$")){
+          	  username=e.data.slice(1);
+          	}else if(e.data.startsWith("&")){
+          	  var turndata=e.data.slice(1);
+          	  if(isNaN(turndata)){
+          	    turnmode=turndata=="s"?1:(turndata=="q"?2:0);
+          	    turnbtn.innerText=(turnmode>0?"end":"take")+" turn";
+          	  }else{
+          	    turntimer=+e.data.slice(1);
+          	  }
+          	}else if(e.data.startsWith("`")||e.data.startsWith("^")){
+              //chat :D
+              if(e.data.startsWith("`")&&!mutedchat){
+                chatsound.currentTime=0;
+                chatsound.play();
+              }
+              if(e.data.slice(1)!=""){
+                chatbox.innerText+=e.data.slice(1)+"\n";
+                chatbox.innerText=chatbox.innerText.split("\n").slice(-100).join("\n");
+                chatbox.scrollTop=chatbox.scrollHeight;
+              }
+            }
+          }
+        }else{
+          if(player!=null&&!muted)player.feed(new Uint8Array(e.data));
+        }
+      };
+      socket.onclose=()=>{
+		chatsound.currentTime=0;
+		chatsound.play();
+		chatbox.innerText+="---\nLost connection to the server. Please reload!\n---";
+		chatbox.scrollTop=chatbox.scrollHeight;
+      };
+      vm.onmousedown=function(e){
+        e.preventDefault();
+        mousebtn|=1<<(e.which-1);
+        var mousepos=mlock?[e.movementX,e.movementY]:calcMousePos(e);
+        x=mousepos[0];
+        y=mousepos[1];
+        if(turnmode==1)socket.send(JSON.stringify({x:x,y:y,button:mousebtn,keydown:null,keyup:null,lock:mlock}));
+      };
+      vm.onmouseup=function(e){
+        mousebtn&=~(1<<(e.which-1));
+        var mousepos=mlock?[e.movementX,e.movementY]:calcMousePos(e);
+        x=mousepos[0];
+        y=mousepos[1];
+        if(turnmode==1)socket.send(JSON.stringify({x:x,y:y,button:mousebtn,keydown:null,keyup:null,lock:mlock}));
+      };
+      vm.onmousemove=function(e){
+        var mousepos=mlock?[e.movementX,e.movementY]:calcMousePos(e);
+        x=mousepos[0];
+        y=mousepos[1];
+        if(turnmode==1)sendMouseMovement=true;
+      };
+      vm.onkeydown=typebox.onkeydown=function(e){
+        e.preventDefault();
+        if(turnmode==1&&!e.repeat)socket.send(JSON.stringify({x:mlock?0:x,y:mlock?0:y,button:mousebtn,keydown:mapKeys(e.which,e.shiftKey),keyup:null,lock:mlock}));
+      };
+      vm.onkeyup=typebox.onkeyup=function(e){
+        e.preventDefault();
+        if(turnmode==1)socket.send(JSON.stringify({x:mlock?0:x,y:mlock?0:y,button:mousebtn,keydown:null,keyup:mapKeys(e.which,e.shiftKey),lock:mlock}));
+      };
+      vm.onclick=function(){
+        if(turnmode==0)turn(1);
+      };
+      setInterval(()=>{
+        if(msgtosend!=""){
+        	socket.send("`"+msgtosend.slice(0,250));
+        	msgtosend="";
+        }
+        if(sendMouseMovement){
+          sendMouseMovement=false;
+          socket.send(JSON.stringify({x:x,y:y,button:mousebtn,keydown:null,keyup:null,lock:mlock}));
+        }
+        chatmsg.placeholder="type something as "+username+" (/help)"+((turnmode>0)?" (turn: "+turntimer+"s)":"");
+      },1000/10);
+	};
+    function calcMousePos(e){
+      var rect=e.target.getBoundingClientRect();
+      //return [(e.clientX-rect.left)*e.target.naturalWidth/rect.width,(e.clientY-rect.top)*e.target.naturalHeight/rect.height];
+      //canvas
+      return [(e.clientX-rect.left)*e.target.width/rect.width,(e.clientY-rect.top)*e.target.height/rect.height];
+    }
+    vm.oncontextmenu=function(e){
+      e.preventDefault();
+    };
+    function turn(){
+      socket.send("&");
+    }
+  </script>
+</html>
