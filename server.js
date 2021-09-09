@@ -14,7 +14,7 @@ var recentips=[];
 var turns=[];
 
 var fps=20,
-    mousefps=10;
+	mousefps=10;
 
 var updloop=-1;
 
@@ -141,17 +141,17 @@ r.on('error', function(err) {
 
 var httpServer = http.createServer((req,res)=>{
   if(["","/"].includes(req.url)){
-    res.writeHead(200,{"Content-Type":"text/html;charset=utf8"});
-    res.end(fs.readFileSync("index.html","utf8"));
+	res.writeHead(200,{"Content-Type":"text/html;charset=utf8"});
+	res.end(fs.readFileSync("index.html","utf8"));
   }else if(req.url=="/pcm-player.min.js"){
-    res.writeHead(200,{"Content-Type":"application/javascript;charset=utf8"});
-    res.end(fs.readFileSync("pcm-player.min.js","utf8"));
+	res.writeHead(200,{"Content-Type":"application/javascript;charset=utf8"});
+	res.end(fs.readFileSync("pcm-player.min.js","utf8"));
   }else if(req.url=="/chat.mp3"){
-    res.writeHead(200,{"Content-Type":"audio/mpeg"});
-    res.end(fs.readFileSync("chat.mp3"));
+	res.writeHead(200,{"Content-Type":"audio/mpeg"});
+	res.end(fs.readFileSync("chat.mp3"));
   }else{
-    res.writeHead(404);
-    res.end("404 Not Found");
+	res.writeHead(404);
+	res.end("404 Not Found");
   }
 }).listen(wsPort);
 
@@ -167,9 +167,9 @@ function updchat(msg,silent){
 setInterval(()=>wss.clients.forEach(c=>c.send(JSON.stringify([0,0,canvas.toBuffer("image/png").toString("base64"),r.width,r.height]))),10000);
 
 var turntimer=20,
-    firstturn=null,
-    turndate=Date.now(),
-    lastRoundTimer=20;
+	firstturn=null,
+	turndate=Date.now(),
+	lastRoundTimer=20;
 
 setInterval(()=>{
 	//whenever turn is added turn timer is started
@@ -213,9 +213,10 @@ wss.on('connection', function (ws, req) {
 		return ws.close();
 	}
 	if(Object.values(wsip).includes(headerip))return ws.close();
-    var connectionId = req.headers['sec-websocket-key'];
-    wsc[connectionId]=ws;
-    wsip[connectionId]=headerip;
+	var connectionId = req.headers['sec-websocket-key'];
+	if(Object.keys(unames).includes(connectionId))return ws.close();
+	wsc[connectionId]=ws;
+	wsip[connectionId]=headerip;
 	while(!(connectionId in unames)){
 		var proposeduname="user"+Math.floor(Math.random()*99999);
 		if(!Object.values(unames).includes(proposeduname))unames[connectionId]=proposeduname;
@@ -226,11 +227,11 @@ wss.on('connection', function (ws, req) {
 	//send uname
 	ws.send("$"+unames[connectionId]);
 
-    //update chat
-    ws.send("`"+chatlog.join("\n"));
+	//update chat
+	ws.send("`"+chatlog.join("\n"));
 
-    //update screen
-    ws.send(JSON.stringify([0,0,canvas.toBuffer("image/png").toString("base64"),r.width,r.height]));
+	//update screen
+	ws.send(JSON.stringify([0,0,canvas.toBuffer("image/png").toString("base64"),r.width,r.height]));
 
 	//control stuff
 	ws.on('message', function (message) {
@@ -279,7 +280,7 @@ wss.on('connection', function (ws, req) {
 							ws.send("^Usage: /username <new>");
 						}else{
 							var oldname=unames[connectionId],
-							    newname=args[1].slice(0,25).replace(/[^A-Za-z0-9_-]/g,"");
+								newname=args[1].slice(0,25).replace(/[^A-Za-z0-9_-]/g,"");
 							if(Object.values(unames).includes(newname)){
 								ws.send("^Sorry, but someone else already has that username!");
 							}else{
@@ -330,23 +331,23 @@ wss.on('connection', function (ws, req) {
 	});
 
 	//user stuff
-    updchat(unames[connectionId]+" connected",1);
+	updchat(unames[connectionId]+" connected",1);
 
-    ws.on('close', function () {
+	ws.on('close', function () {
 	  if(recentips.includes(wsip[connectionId]))setTimeout(ip=>recentips.splice(recentips.indexOf(ip),1),10000,wsip[connectionId]);
-      updchat(unames[connectionId]+" disconnected",1);
-      delete unames[connectionId];
-      delete wsc[connectionId];
-      delete wsip[connectionId];
-      if(turns.includes(connectionId))turns.splice(turns.indexOf(connectionId),1);
-    });
+	  updchat(unames[connectionId]+" disconnected",1);
+	  delete unames[connectionId];
+	  delete wsc[connectionId];
+	  delete wsip[connectionId];
+	  if(turns.includes(connectionId))turns.splice(turns.indexOf(connectionId),1);
+	});
 });
 
 console.log('Listening on port:', wsPort);
 
 const rtAudio = new RtAudio(RtAudioApi.WINDOWS_WASAPI);
 rtAudio.openStream(null,
-	{ deviceId: rtAudio.getDevices().map(e=>e.name.trim()).indexOf("CABLE Output (VB-Audio Virtual Cable)"/*"Virtual Audio Input (VB-Audio Virtual Cable)"*/),//rtAudio.getDefaultOutputDevice(),
+	{ deviceId: rtAudio.getDevices().map(e=>e.name.trim()).indexOf(/*"CABLE Output (VB-Audio Virtual Cable)"*/"Virtual Audio Input (VB-Audio Virtual Cable)"),//rtAudio.getDefaultOutputDevice(),
 	  nChannels: 2,
 	  firstChannel: 0
 	},
@@ -386,9 +387,9 @@ var readline=require("readline").createInterface({input:process.stdin,output:pro
   var res=hits.length?hits:completions;
   var args=line.split(" ");
   if(args.length>1){
-    var unamelist=Object.values(unames);
-    res=args[args.length-1]==""?unamelist:unamelist.filter((c)=>c.startsWith(args[args.length-1]));
-    res=res.map(c=>args.slice(0,-1).join(" ")+" "+c)
+	var unamelist=Object.values(unames);
+	res=args[args.length-1]==""?unamelist:unamelist.filter((c)=>c.startsWith(args[args.length-1]));
+	res=res.map(c=>args.slice(0,-1).join(" ")+" "+c)
   }
   return [res,line];
 }});
@@ -398,75 +399,75 @@ process.stdout.write("Command: ");
 readline.on('line',cmd=>{
   var args=cmd.trim().split(" ");
   switch(args[0]){
-    case "help":
-      console.log("Commands: "+commands);
-      break;
-    case "list":
-      console.log("Users: "+Object.values(unames).join(" "));
-      break;
-    case "ips":
-      console.log(Object.keys(unames).map(e=>unames[e]+": "+wsip[e]).join("\n"));
-      break;
-    case "turns":
-      console.log("Turns: "+turns.map(x=>unames[x]).join(", "));
-      break;
-    case "username":
-      if(args.length<3){
-        console.log("usage: username <oldname> <newname>");
-      }else{
-        if(Object.values(unames).includes(args[2])){
-          console.log("error: that user already exists!");
-        }else{
-          var nind=Object.values(unames).indexOf(args[1]);
-          if(nind==-1){
-            console.log("error: that user was not found!");
-          }else{
-            var key=Object.keys(unames)[nind];
-            unames[key]=args[2];
-            updchat('User "'+args[1]+'" is now "'+args[2]+'"',1);
-            if(wsc[firstturn].readyState==wsc[firstturn].OPEN)wsc[key].send("$"+args[2]);
-            console.log('changed user "'+args[1]+'" to "'+args[2]+'"');
-          }
-        }
-      }
-      break;
-    case "kick":
-      if(args.length<2){
-        console.log("usage: kick <username>");
-      }else{
-        if(Object.values(unames).includes(args[1])){
-          var key=Object.keys(unames)[Object.values(unames).indexOf(args[1])];
-          if(wsc[firstturn].readyState==wsc[firstturn].OPEN)wsc[key].close();
-          console.log('kicked user "'+args[1]+'"!');
-        }else{
-          console.log("error: that user does not exist!");
-        }
-      }
-      break;
-    case "endturn":
-      if(args.length<2){
-        console.log("usage: endturn <username>");
-      }else{
-        if(Object.values(unames).includes(args[1])){
-          var key=Object.keys(unames)[Object.values(unames).indexOf(args[1])];
-          var turnind=turns.indexOf(key);
-          if(turnind==-1){
+	case "help":
+	  console.log("Commands: "+commands);
+	  break;
+	case "list":
+	  console.log("Users: "+Object.values(unames).join(" "));
+	  break;
+	case "ips":
+	  console.log(Object.keys(unames).map(e=>unames[e]+": "+wsip[e]).join("\n"));
+	  break;
+	case "turns":
+	  console.log("Turns: "+turns.map(x=>unames[x]).join(", "));
+	  break;
+	case "username":
+	  if(args.length<3){
+		console.log("usage: username <oldname> <newname>");
+	  }else{
+		if(Object.values(unames).includes(args[2])){
+		  console.log("error: that user already exists!");
+		}else{
+		  var nind=Object.values(unames).indexOf(args[1]);
+		  if(nind==-1){
+			console.log("error: that user was not found!");
+		  }else{
+			var key=Object.keys(unames)[nind];
+			unames[key]=args[2];
+			updchat('User "'+args[1]+'" is now "'+args[2]+'"',1);
+			if(wsc[firstturn].readyState==wsc[firstturn].OPEN)wsc[key].send("$"+args[2]);
+			console.log('changed user "'+args[1]+'" to "'+args[2]+'"');
+		  }
+		}
+	  }
+	  break;
+	case "kick":
+	  if(args.length<2){
+		console.log("usage: kick <username>");
+	  }else{
+		if(Object.values(unames).includes(args[1])){
+		  var key=Object.keys(unames)[Object.values(unames).indexOf(args[1])];
+		  if(wsc[firstturn].readyState==wsc[firstturn].OPEN)wsc[key].close();
+		  console.log('kicked user "'+args[1]+'"!');
+		}else{
+		  console.log("error: that user does not exist!");
+		}
+	  }
+	  break;
+	case "endturn":
+	  if(args.length<2){
+		console.log("usage: endturn <username>");
+	  }else{
+		if(Object.values(unames).includes(args[1])){
+		  var key=Object.keys(unames)[Object.values(unames).indexOf(args[1])];
+		  var turnind=turns.indexOf(key);
+		  if(turnind==-1){
 			console.log("error: user is not taking a turn!");
 		  }else{
 			turns.splice(turnind,1);
 		  }
-          console.log('ended turn of user "'+args[1]+'"!');
-        }else{
-          console.log("error: that user does not exist!");
-        }
-      }
-      break;
-    case "quit":
-      console.log("Exiting...");
-      process.exit();
-      break;
-    default:
-      console.log("Unknown command!");
+		  console.log('ended turn of user "'+args[1]+'"!');
+		}else{
+		  console.log("error: that user does not exist!");
+		}
+	  }
+	  break;
+	case "quit":
+	  console.log("Exiting...");
+	  process.exit();
+	  break;
+	default:
+	  console.log("Unknown command!");
   }
   process.stdout.write("Command: ");
   readline.question();
