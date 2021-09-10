@@ -852,11 +852,11 @@
       };
       vm.onkeydown=typebox.onkeydown=function(e){
         e.preventDefault();
-        if(turnmode==1&&!e.repeat)socket.send(JSON.stringify({x:mlock?0:x,y:mlock?0:y,button:mousebtn,keydown:mapKeys(e.which,e.shiftKey),keyup:null,lock:mlock}));
+        if(turnmode==1&&!e.repeat)socket.send(JSON.stringify({x:null,y:null,button:mousebtn,keydown:mapKeys(e.which,e.shiftKey),keyup:null,lock:mlock}));
       };
       vm.onkeyup=typebox.onkeyup=function(e){
         e.preventDefault();
-        if(turnmode==1)socket.send(JSON.stringify({x:mlock?0:x,y:mlock?0:y,button:mousebtn,keydown:null,keyup:mapKeys(e.which,e.shiftKey),lock:mlock}));
+        if(turnmode==1)socket.send(JSON.stringify({x:null,y:null,button:mousebtn,keydown:null,keyup:mapKeys(e.which,e.shiftKey),lock:mlock}));
       };
       setInterval(()=>{
         if(msgtosend!=""){
