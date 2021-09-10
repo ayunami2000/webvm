@@ -2,9 +2,9 @@
   "name": "webvm",
   "version": "0.0.1",
   "author": {
-    "name" : "ayunami2000",
-    "email" : "spwilliamsiam@gmail.com",
-    "url" : "https://github.com/ayunami2000"
+    "name": "ayunami2000",
+    "email": "spwilliamsiam@gmail.com",
+    "url": "https://github.com/ayunami2000"
   },
   "description": "",
   "main": "server.js",
@@ -15,7 +15,8 @@
     "audify": "^1.6.3",
     "canvas": "^2.8.0",
     "pixelmatch": "^5.2.1",
-    "rfb2": "^0.2.2",
+    "rfb2": "git+https://github.com/ayunami2000/node-rfb2.git",
+    "telnetlib": "^1.0.1",
     "ws": "^8.2.1"
   },
   "engines": {
