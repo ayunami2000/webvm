@@ -2,16 +2,24 @@ var http = require('http');
 var fs = require("fs");
 var WebSocketServer = require('ws').Server;
 const { RtAudio, RtAudioFormat, RtAudioStreamFlags, RtAudioApi } = require("audify");
+var telnetlib=require("telnetlib");
+
+var telqmp=telnetlib.createConnection({host:"127.0.0.1",port:1984},()=>{
+	telqmp.write('{"execute":"qmp_capabilities"}');
+	//setInterval(()=>telqmp.write("{}"),0);
+});
 
 var wsPort = 80;
 var listeners = {};
 var lockpos=[0,0];
+var oldbtn=[];
 var chatlog=[];
 var unames={};
 var wsc={};
 var wsip={};
 var recentips=[];
 var turns=[];
+var sleep=ms=>new Promise(a=>setTimeout(a,ms));
 
 var fps=20,
 	mousefps=10,
@@ -121,11 +129,11 @@ r.on('rect', function(rect) {
   cropcanvas.height=rect.height;
   var check=checkIfCanvasNeedsToBeUpdated();
   if(check[0]){
-	cropctx.globalCompositeOperation="source-over";
+	//cropctx.globalCompositeOperation="source-over";
 	cropctx.clearRect(0,0,cropcanvas.width,cropcanvas.height);
 	cropctx.putImageData(check[1],0,0);
 	var sides=detectDiff(cropcanvas);
-	cropctx.globalCompositeOperation="source-in";
+	//cropctx.globalCompositeOperation="source-in";
 	cropcanvas.width-=sides[3]+sides[1];
 	cropcanvas.height-=sides[0]+sides[2];
 	cropctx.drawImage(canvas,rect.x,rect.y,rect.width,rect.height,-sides[3],-sides[0],cropcanvas.width+sides[3]+sides[1],cropcanvas.height+sides[0]+sides[2]);
@@ -236,7 +244,6 @@ wss.on('connection', function (ws, req) {
 
 	//control stuff
 	ws.on('message', function (message) {
-		//process.stdout.write(".");
 		var jsonMsg={};
 		try{
 			jsonMsg=JSON.parse(message);
@@ -310,19 +317,24 @@ wss.on('connection', function (ws, req) {
 		jsonMsg.button=+jsonMsg.button||0;
 		if(jsonMsg.keydown!=null)jsonMsg.keydown=+jsonMsg.keydown;
 		if(jsonMsg.keyup!=null)jsonMsg.keyup=+jsonMsg.keyup;
+		jsonMsg.x=+jsonMsg.x||null;
+		jsonMsg.y=+jsonMsg.y||null;
 
-		if(jsonMsg.lock){
-			lockpos=[lockpos[0]+jsonMsg.x,lockpos[1]+jsonMsg.y];
-			jsonMsg.x=lockpos[0];
-			jsonMsg.y=lockpos[1];
-		}else{
-			lockpos=[jsonMsg.x,jsonMsg.y];
+		if(jsonMsg.x!=null&&jsonMsg.y!=null){
+			if(jsonMsg.lock){
+				lockpos=[lockpos[0]+jsonMsg.x,lockpos[1]+jsonMsg.y];
+				jsonMsg.x=lockpos[0];
+				jsonMsg.y=lockpos[1];
+			}else{
+				lockpos=[jsonMsg.x,jsonMsg.y];
+				jsonMsg.x=Math.min((+jsonMsg.x)||-1,r.width);
+				jsonMsg.y=Math.min((+jsonMsg.y)||-1,r.height);
+			}
+			//delta (WIP)
+			//r.pointerDelta(+jsonMsg.lock);
+			//move mouse
+			r.pointerEvent(jsonMsg.x,jsonMsg.y,jsonMsg.button);
 		}
-		jsonMsg.x=Math.min((+jsonMsg.x)||-1,r.width);
-		jsonMsg.y=Math.min((+jsonMsg.y)||-1,r.height);
-		if(jsonMsg.x==-1||jsonMsg.y==-1)return;//dont move mouse but keep ws open
-		//move mouse
-		r.pointerEvent(jsonMsg.x,jsonMsg.y,jsonMsg.button);
 		//press keys
 		if(jsonMsg.keydown!=null)r.keyEvent(jsonMsg.keydown,1);
 		//release keys
@@ -349,7 +361,7 @@ console.log('Listening on port:', wsPort);
 
 const rtAudio = new RtAudio(RtAudioApi.WINDOWS_WASAPI);
 rtAudio.openStream(null,
-	{ deviceId: rtAudio.getDevices().map(e=>e.name.trim()).indexOf(/*"CABLE Output (VB-Audio Virtual Cable)"*/"Virtual Audio Input (VB-Audio Virtual Cable)"),//rtAudio.getDefaultOutputDevice(),
+	{ deviceId: rtAudio.getDevices().map(e=>e.name.trim()).indexOf("CABLE Output (VB-Audio Virtual Cable)"/*"Virtual Audio Input (VB-Audio Virtual Cable)"*/),//rtAudio.getDefaultOutputDevice(),
 	  nChannels: 2,
 	  firstChannel: 0
 	},
@@ -381,7 +393,7 @@ function checkIfCanvasNeedsToBeUpdated(){
 	return [res,diff];
 }
 
-var commands="help quit list ips username kick endturn turns";
+var commands="help quit list ips username kick endturn turns reset";
 
 var readline=require("readline").createInterface({input:process.stdin,output:process.stdout,prompt:"Command: ",completer:function(line){
   var completions=commands.split(" ");
@@ -463,6 +475,10 @@ readline.on('line',cmd=>{
 		  console.log("error: that user does not exist!");
 		}
 	  }
+	  break;
+	case "reset":
+	  console.log("Resetting VM...");
+	  telqmp.write('{"execute":"system_reset"}');
 	  break;
 	case "quit":
 	  console.log("Exiting...");
