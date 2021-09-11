@@ -62,8 +62,8 @@ function detectDiff(canvass,tolerance){
 
 	if (top === canvass.height) {
 		//throw new Error("Can't detect edges.");
-		//return [0,0,0,0];
-		return [0,canvass.width-1,canvass.height-1,0];
+		return [0,0,0,0];
+		//return [0,canvass.width-1,canvass.height-1,0];
 	}
 
 	// Left
