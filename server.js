@@ -6,7 +6,7 @@ var telnetlib=require("telnetlib");
 
 var telqmp=telnetlib.createConnection({host:"127.0.0.1",port:1984},()=>{
 	telqmp.write('{"execute":"qmp_capabilities"}');
-	//setInterval(()=>telqmp.write("{}"),0);
+	setInterval(()=>telqmp.write(""),0);//bullshit innit
 });
 
 var wsPort = 80;
@@ -361,7 +361,7 @@ console.log('Listening on port:', wsPort);
 
 const rtAudio = new RtAudio(RtAudioApi.WINDOWS_WASAPI);
 rtAudio.openStream(null,
-	{ deviceId: rtAudio.getDevices().map(e=>e.name.trim()).indexOf("CABLE Output (VB-Audio Virtual Cable)"/*"Virtual Audio Input (VB-Audio Virtual Cable)"*/),//rtAudio.getDefaultOutputDevice(),
+	{ deviceId: rtAudio.getDevices().map(e=>e.name.trim()).indexOf(/*"CABLE Output (VB-Audio Virtual Cable)"*/"Virtual Audio Input (VB-Audio Virtual Cable)"),//rtAudio.getDefaultOutputDevice(),
 	  nChannels: 2,
 	  firstChannel: 0
 	},
