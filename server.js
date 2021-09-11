@@ -12,6 +12,7 @@ var telqmp=telnetlib.createConnection({host:"127.0.0.1",port:1984},()=>{
 var wsPort = 80;
 var listeners = {};
 var lockpos=[0,0];
+var oldlock=false;
 var oldbtn=[];
 var chatlog=[];
 var unames={};
@@ -93,17 +94,26 @@ function detectDiff(canvass,tolerance){
 	return [top,right,bottom,left];
 }
 
-
-var args = {
+var vncargs = {
   host: '127.0.0.1',
-  port: 5900
+  port: 5900,
+  encodings: [
+    rfb.encodings.raw,
+    rfb.encodings.copyRect,
+    rfb.encodings.pseudoDesktopSize//,
+    //rfb.encodings.pseudoQemuPointerMotionChange//,
+    //rfb.encodings.pseudoQemuAudio
+  ]
 };
-var r = rfb.createConnection(args);
+var r = rfb.createConnection(vncargs);
 
 r.on('connect', function() {
 	canvas.width=r.width;
 	canvas.height=r.height;
 	updloop=setInterval(()=>r.requestUpdate(false, 0, 0, r.width, r.height),1000/fps);
+	/*r.audio(true,function(data,length){
+		console.log(data);
+	});*/
 });
 r.on('resize', function(rect) {
 	cachedliteraldata=[];
@@ -322,16 +332,20 @@ wss.on('connection', function (ws, req) {
 
 		if(jsonMsg.x!=null&&jsonMsg.y!=null){
 			if(jsonMsg.lock){
-				lockpos=[lockpos[0]+jsonMsg.x,lockpos[1]+jsonMsg.y];
-				jsonMsg.x=lockpos[0];
-				jsonMsg.y=lockpos[1];
+				var tmplp=[jsonMsg.x,jsonMsg.y];
+				jsonMsg.x+=0x7FFF-lockpos[0];
+				jsonMsg.y+=0x7FFF-lockpos[1];
+				lockpos=tmplp;
 			}else{
-				lockpos=[jsonMsg.x,jsonMsg.y];
 				jsonMsg.x=Math.min((+jsonMsg.x)||-1,r.width);
 				jsonMsg.y=Math.min((+jsonMsg.y)||-1,r.height);
+				lockpos=[jsonMsg.x,jsonMsg.y];
 			}
 			//delta (WIP)
-			//r.pointerDelta(+jsonMsg.lock);
+			if(jsonMsg.lock!=oldlock){
+				//r.pointerDelta(jsonMsg.lock);
+			}
+			oldlock=jsonMsg.lock;
 			//move mouse
 			r.pointerEvent(jsonMsg.x,jsonMsg.y,jsonMsg.button);
 		}
@@ -341,7 +355,7 @@ wss.on('connection', function (ws, req) {
 		if(jsonMsg.keyup!=null)r.keyEvent(jsonMsg.keyup,0);
 
 		//minecraft lol
-		lockpos=[canvas.width/2,canvas.height/2];
+		//lockpos=[canvas.width/2,canvas.height/2];
 	});
 
 	//user stuff
@@ -371,7 +385,7 @@ rtAudio.openStream(null,
 	"webvm",
 	pcm => {
 		if(!pcm.every(p=>p==0x00))wss.clients.forEach(c=>{
-			c.send(pcm,{binary:true});
+			//c.send(pcm,{binary:true});
 		});
 	},null,RtAudioStreamFlags.RTAUDIO_MINIMIZE_LATENCY,e=>{if(!rtAudio.isStreamRunning())rtAudio.start();}
 );
