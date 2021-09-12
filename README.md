@@ -19,7 +19,5 @@ then change the default text specifying the audio device to your speaker (or (vi
 
 - after certain number of refreshes, delay ip connections
 - if key already exists then disallow connection (also limit key length)
-- add reset button
-- start qemu via node
+- add voting system
 - multiple vms
-- update rfb2 manually with qemu local mouse support and maybe even audio support (WIP)
