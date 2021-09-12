@@ -15,8 +15,8 @@
     "audify": "^1.6.3",
     "canvas": "^2.8.0",
     "pixelmatch": "^5.2.1",
-    "rfb2": "git+https://github.com/ayunami2000/node-rfb2.git",
     "telnetlib": "^1.0.1",
+    "vnc-rfb-client": "git+https://github.com/ayunami2000/vnc-rfb-client.git",
     "ws": "^8.2.1"
   },
   "engines": {
