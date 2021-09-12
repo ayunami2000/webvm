@@ -345,7 +345,6 @@ wss.on('connection', function (ws, req) {
 		jsonMsg.click=!!jsonMsg.click;
 		jsonMsg.lock=!!jsonMsg.lock;
 		if(!Array.isArray(jsonMsg.button)||jsonMsg.button.length!=8)jsonMsg.button=[false,false,false,false,false,false,false,false];
-		if(jsonMsg.button.reduce((p,c)=>p||c))console.log(123);
 		if(jsonMsg.keydown!=null)jsonMsg.keydown=+jsonMsg.keydown;
 		if(jsonMsg.keyup!=null)jsonMsg.keyup=+jsonMsg.keyup;
 		jsonMsg.x=+jsonMsg.x||null;
