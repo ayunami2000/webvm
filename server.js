@@ -1,42 +1,53 @@
-var http = require('http');
-var fs = require("fs");
-var WebSocketServer = require('ws').Server;
-const { RtAudio, RtAudioFormat, RtAudioStreamFlags, RtAudioApi } = require("audify");
-var telnetlib=require("telnetlib");
-
-var telqmp=telnetlib.createConnection({host:"127.0.0.1",port:1984},()=>{
-	telqmp.write('{"execute":"qmp_capabilities"}');
-	setInterval(()=>telqmp.write(""),0);//bullshit innit
-});
-
-var wsPort = 80;
-var listeners = {};
-var lockpos=[0,0];
-var oldlock=false;
-var oldbtn=[];
-var chatlog=[];
-var unames={};
-var wsc={};
-var wsip={};
-var recentips=[];
-var turns=[];
-var sleep=ms=>new Promise(a=>setTimeout(a,ms));
-
-var fps=20,
-	mousefps=10,
-	imgq={quality:0.25,progressive:true,chromaSubsampling:true};
-
-var updloop=-1;
-
-var rfb = require('rfb2');
+const http = require('http');
+const fs = require("fs");
+const WebSocketServer = require('ws').Server;
+const telnetlib=require("telnetlib");
+const VncClient=require("vnc-rfb-client");
+const exec = require('child_process').exec;
 
 const { createCanvas } = require('canvas')
 const canvas = createCanvas(1,1);
 const ctx = canvas.getContext('2d');
-const cropcanvas=createCanvas(1,1),
-	  cropctx=cropcanvas.getContext("2d");
 
-var cachedliteraldata=[];
+/*
+D:/qemu/qemu-system-x86_64.exe -L D:/qemu -qmp tcp:127.0.0.1:1984,server,nowait -accel hax -device intel-hda -device hda-output -vnc :0 -boot d -cdrom "D:/VirtualBox VMs/slax-64bit-9.11.0.iso" -m 2048 -net nic,model=virtio -net user -rtc base=localtime,clock=host -smp cores=4,threads=4 -usbdevice tablet -vga vmware
+D:/qemu/qemu-system-x86_64.exe -L D:/qemu -qmp tcp:127.0.0.1:1984,server,nowait -accel hax -device intel-hda -device hda-output -vnc :0 -boot d -cdrom "D:/VirtualBox VMs/more ISOs/geexbox-3.1-x86_64.iso" -m 2048 -net nic,model=e1000 -net user -rtc base=localtime,clock=host -smp cores=4,threads=4 -usbdevice tablet -vga vmware
+D:/qemu/qemu-system-x86_64.exe -L D:/qemu -qmp tcp:127.0.0.1:1984,server,nowait -accel hax -vnc :0 -device intel-hda -device hda-output -hda D:/Documents/cvm/emulator/hda.img -m 3072 -net nic,model=e1000 -net user -rtc base=localtime,clock=host -smp cores=4,threads=4 -usbdevice tablet -vga vmware
+D:/qemu/qemu-system-x86_64.exe -L D:/qemu -qmp tcp:127.0.0.1:1984,server,nowait -accel hax -vnc :0 -device intel-hda -device hda-output -boot d -cdrom "D:/VirtualBox VMs/webconverger.iso" -m 3072 -net nic,model=virtio -net user -rtc base=localtime,clock=host -smp cores=4,threads=4 -usbdevice tablet -vga vmware
+*/
+
+//remove -usbdevice tablet for pointer lock
+
+var qemuproc=exec('D:/qemu/qemu-system-x86_64.exe -L D:/qemu -qmp tcp:127.0.0.1:1984,server,nowait -accel hax -vnc :0 -device intel-hda -device hda-output -boot d -cdrom "D:/VirtualBox VMs/webconverger.iso" -m 3072 -net nic,model=virtio -net user -rtc base=localtime,clock=host -smp cores=4,threads=4 -usbdevice tablet -vga vmware'),
+	telqmp=null,
+	wsPort = 80,
+	listeners = {},
+	lockpos=[0,0],
+	oldbtn=[],
+	chatlog=[],
+	unames={},
+	wsc={},
+	wsip={},
+	recentips=[],
+	turns=[],
+	cachedscreen="",
+	cachedliteraldata=[],
+	sleep=ms=>new Promise(a=>setTimeout(a,ms)),
+	fps=20,
+	mousefps=10,
+	relSens=2,
+	imgq={quality:0.25,progressive:true,chromaSubsampling:true},
+	updloop=-1,
+	oldsize=[],
+	wss=null;
+
+setTimeout(()=>{
+	telqmp=telnetlib.createConnection({host:"127.0.0.1",port:1984},()=>{
+		telqmp.write('{"execute":"qmp_capabilities"}');
+		setInterval(()=>telqmp.write(""),0);//bullshit innit
+	});
+},250);
+
 const checkIfNotSolid = tolerance => (pixels) => {
 	let solid = false;
 	for (let i = 0; i < pixels.length && !solid; i += 4) {
@@ -94,68 +105,79 @@ function detectDiff(canvass,tolerance){
 	return [top,right,bottom,left];
 }
 
-var vncargs = {
-  host: '127.0.0.1',
-  port: 5900,
-  encodings: [
-    rfb.encodings.raw,
-    rfb.encodings.copyRect,
-    rfb.encodings.pseudoDesktopSize//,
-    //rfb.encodings.pseudoQemuPointerMotionChange//,
-    //rfb.encodings.pseudoQemuAudio
-  ]
+const vncOpts={
+    encodings:[
+        VncClient.consts.encodings.raw,
+        VncClient.consts.encodings.pseudoDesktopSize,
+        VncClient.consts.encodings.pseudoQemuAudio,
+        VncClient.consts.encodings.pseudoQemuPointerMotionChange
+    ],
+    fps:0
 };
-var r = rfb.createConnection(vncargs);
+var vncWaitingToConnect=false;
+const vncClient=new VncClient(vncOpts);
+const vncConnectOpts={host:'127.0.0.1',port:5900};
+vncClient.connect(vncConnectOpts);
 
-r.on('connect', function() {
-	canvas.width=r.width;
-	canvas.height=r.height;
-	updloop=setInterval(()=>r.requestUpdate(false, 0, 0, r.width, r.height),1000/fps);
-	/*r.audio(true,function(data,length){
-		console.log(data);
-	});*/
+vncClient.on('audioStream',buffer=>{
+	if(!buffer.every(p=>p==0x00))wss.clients.forEach(c=>{
+		c.send(buffer,{binary:true});
+	});
 });
-r.on('resize', function(rect) {
-	cachedliteraldata=[];
-	canvas.width=rect.width;
-	canvas.height=rect.height;
+vncClient.on('connectTimeout',()=>{
+	if(vncWaitingToConnect)return;
+	vncWaitingToConnect=true;
+    console.log('[vnc] connection timeout, waiting 8s and reconnecting...');
+    vncClient.resetState();//idk lol
+	setTimeout(()=>{
+		vncWaitingToConnect=false;
+		vncClient.connect(vncConnectOpts);
+	},8000);
 });
-r.on('rect', function(rect) {
-	if(rect.encoding==rfb.encodings.copyRect){
-		ctx.putImageData(ctx.getImageData(rect.src.x,rect.src.y,rect.width,rect.height),rect.x,rect.y);
+vncClient.on('closed',()=>{
+	if(vncWaitingToConnect)return;
+	vncWaitingToConnect=true;
+    console.log('[vnc] disconnected, waiting 8s and reconnecting...');
+    wss.clients.forEach(c=>c.send("`VM Disconnected. Reconnecting..."));
+    setTimeout(()=>{
+		vncWaitingToConnect=false;
+		vncClient.connect(vncConnectOpts);
+	},8000);
+});
+vncClient.on('frameUpdated',fb=>{
+	if(vncClient.clientWidth!=oldsize[0]||vncClient.clientHeight!=oldsize[1])cachedliteraldata=[];
+	oldsize=[vncClient.clientWidth,vncClient.clientHeight];
+	canvas.width=vncClient.clientWidth;
+	canvas.height=vncClient.clientHeight;
+	var id = ctx.createImageData(canvas.width,canvas.height);
+	var offset = 0;
+	for (var i=0; i < fb.length; i += 4) {
+		id.data[offset++] = fb[i];
+		id.data[offset++] = fb[i+1];
+		id.data[offset++] = fb[i+2];
+		id.data[offset++] = 255;//fb[i+3];
 	}
-  if(!rect.encoding==rfb.encodings.raw)return;
-  var id = ctx.createImageData(rect.width,rect.height);
-  var offset = 0;
-  for (var i=0; i < rect.data.length; i += 4) {
-	  id.data[offset++] = rect.data[i+2];
-	  id.data[offset++] = rect.data[i+1];
-	  id.data[offset++] = rect.data[i];
-	  id.data[offset++] = 255;//rect.data[i+3];
-  }
-  ctx.putImageData(id, rect.x, rect.y);
-
-  cropcanvas.width=rect.width;
-  cropcanvas.height=rect.height;
-  var check=checkIfCanvasNeedsToBeUpdated();
-  if(check[0]){
-	//cropctx.globalCompositeOperation="source-over";
-	cropctx.clearRect(0,0,cropcanvas.width,cropcanvas.height);
-	cropctx.putImageData(check[1],0,0);
-	var sides=detectDiff(cropcanvas);
-	//cropctx.globalCompositeOperation="source-in";
-	cropcanvas.width-=sides[3]+sides[1];
-	cropcanvas.height-=sides[0]+sides[2];
-	cropctx.drawImage(canvas,rect.x,rect.y,rect.width,rect.height,-sides[3],-sides[0],cropcanvas.width+sides[3]+sides[1],cropcanvas.height+sides[0]+sides[2]);
-	var cropbuffer=cropcanvas.toBuffer("image/jpeg",imgq);
-	wss.clients.forEach(c=>c.send(JSON.stringify([rect.x+sides[3],rect.y+sides[0],cropbuffer.toString("base64"),r.width,r.height])));
-  }
-});
-r.on('error', function(err) {
-  console.error(err);
-  clearInterval(updloop);
-  r.end();
-  process.exit(1);
+	ctx.putImageData(id,0,0);
+	if(cachedscreen=="")cachedscreen=canvas.toBuffer("image/jpeg",imgq).toString("base64");
+	var check=checkIfCanvasNeedsToBeUpdated();
+	if(check[0]){
+		cachedscreen=canvas.toBuffer("image/jpeg",imgq).toString("base64");//is always 1frame behind but thats ok
+		if(check[1]==null){
+			wss.clients.forEach(c=>c.send(JSON.stringify([0,0,cachedscreen,vncClient.clientWidth,vncClient.clientHeight])));
+		}else{
+			ctx.globalCompositeOperation="source-over";
+			var tmpdata=ctx.getImageData(0,0,canvas.width,canvas.height);
+			ctx.clearRect(0,0,canvas.width,canvas.height);
+			ctx.putImageData(check[1],0,0);
+			var sides=detectDiff(canvas);
+			ctx.globalCompositeOperation="source-in";
+			canvas.width-=sides[3]+sides[1];
+			canvas.height-=sides[0]+sides[2];
+			ctx.putImageData(tmpdata,-sides[3],-sides[0]);
+			var cropbuffer=canvas.toBuffer("image/jpeg",imgq);
+			wss.clients.forEach(c=>c.send(JSON.stringify([sides[3],sides[0],cropbuffer.toString("base64"),vncClient.clientWidth,vncClient.clientHeight])));
+		}
+	}
 });
 
 var httpServer = http.createServer((req,res)=>{
@@ -174,16 +196,13 @@ var httpServer = http.createServer((req,res)=>{
   }
 }).listen(wsPort);
 
-var wss = new WebSocketServer({ server: httpServer });
+wss = new WebSocketServer({ server: httpServer });
 
 function updchat(msg,silent){
 	chatlog.push(msg);
 	chatlog=chatlog.slice(chatlog.length-100);
 	wss.clients.forEach(c=>c.send((silent?"^":"`")+chatlog[chatlog.length-1]));
 }
-
-//every 10s update whole screen
-setInterval(()=>wss.clients.forEach(c=>c.send(JSON.stringify([0,0,canvas.toBuffer("image/jpeg",imgq).toString("base64"),r.width,r.height]))),10000);
 
 var turntimer=20,
 	firstturn=null,
@@ -250,7 +269,7 @@ wss.on('connection', function (ws, req) {
 	ws.send("`"+chatlog.join("\n"));
 
 	//update screen
-	ws.send(JSON.stringify([0,0,canvas.toBuffer("image/jpeg",imgq).toString("base64"),r.width,r.height]));
+	if(vncClient._connected)ws.send(JSON.stringify([0,0,cachedscreen,vncClient.clientWidth,vncClient.clientHeight]));
 
 	//control stuff
 	ws.on('message', function (message) {
@@ -318,47 +337,55 @@ wss.on('connection', function (ws, req) {
 			}
 			return;
 		}
-		if(!("x" in jsonMsg&&"y" in jsonMsg&&"button" in jsonMsg&&"keydown" in jsonMsg&&"keyup" in jsonMsg&&"lock" in jsonMsg))return ws.close();
+		if(!vncClient._connected)return;
+		if(!("x" in jsonMsg&&"y" in jsonMsg&&"button" in jsonMsg&&"keydown" in jsonMsg&&"keyup" in jsonMsg&&"lock" in jsonMsg&&"mm" in jsonMsg))return ws.close();
 		if((turns.length==0?null:turns[0])!=connectionId){
 			return;
 		}
 		jsonMsg.click=!!jsonMsg.click;
 		jsonMsg.lock=!!jsonMsg.lock;
-		jsonMsg.button=+jsonMsg.button||0;
+		if(!Array.isArray(jsonMsg.button)||jsonMsg.button.length!=8)jsonMsg.button=[false,false,false,false,false,false,false,false];
+		if(jsonMsg.button.reduce((p,c)=>p||c))console.log(123);
 		if(jsonMsg.keydown!=null)jsonMsg.keydown=+jsonMsg.keydown;
 		if(jsonMsg.keyup!=null)jsonMsg.keyup=+jsonMsg.keyup;
 		jsonMsg.x=+jsonMsg.x||null;
 		jsonMsg.y=+jsonMsg.y||null;
+		jsonMsg.mm=!!jsonMsg.mm;
 
 		if(jsonMsg.x!=null&&jsonMsg.y!=null){
+			jsonMsg.x=+jsonMsg.x||0;
+			jsonMsg.y=+jsonMsg.y||0;
 			if(jsonMsg.lock){
-				//var tmplp=[jsonMsg.x,jsonMsg.y];
-				//jsonMsg.x+=0x7FFF-lockpos[0];
-				//jsonMsg.y+=0x7FFF-lockpos[1];
-				//lockpos=tmplp;
-				jsonMsg.x+=lockpos[0];
-				jsonMsg.y+=lockpos[1];
-				//lockpos=[jsonMsg.x,jsonMsg.y];
+				if(vncClient._relativePointer){
+					lockpos=[lockpos[0]+jsonMsg.x,lockpos[1]+jsonMsg.y];
+					jsonMsg.x=Math.max(-32767,Math.min(jsonMsg.x*relSens,32767));
+					jsonMsg.y=Math.max(-32767,Math.min(jsonMsg.y*relSens,32767));
+				}else{
+					lockpos=[lockpos[0]+jsonMsg.x*relSens,lockpos[1]+jsonMsg.y*relSens];
+					jsonMsg.x=Math.max(0,Math.min(lockpos[0],vncClient.clientWidth,65535));
+					jsonMsg.y=Math.max(0,Math.min(lockpos[1],vncClient.clientHeight,65535));
+				}
 			}else{
-				jsonMsg.x=Math.min((+jsonMsg.x)||-1,r.width);
-				jsonMsg.y=Math.min((+jsonMsg.y)||-1,r.height);
-				lockpos=[jsonMsg.x,jsonMsg.y];
+				if(vncClient._relativePointer){
+					var tmplp=[jsonMsg.x,jsonMsg.y];
+					jsonMsg.x-=lockpos[0];
+					jsonMsg.y-=lockpos[1];
+					lockpos=tmplp;
+					jsonMsg.x=Math.max(-32767,Math.min(jsonMsg.x,32767));
+					jsonMsg.y=Math.max(-32767,Math.min(jsonMsg.y,32767));
+				}else{
+					jsonMsg.x=Math.max(0,Math.min(jsonMsg.x,vncClient.clientWidth,65535));
+					jsonMsg.y=Math.max(0,Math.min(jsonMsg.y,vncClient.clientHeight,65535));
+					lockpos=[jsonMsg.x,jsonMsg.y];
+				}
 			}
-			//delta (WIP)
-			if(jsonMsg.lock!=oldlock){
-				//r.pointerDelta(jsonMsg.lock);
-			}
-			oldlock=jsonMsg.lock;
 			//move mouse
-			r.pointerEvent(jsonMsg.x,jsonMsg.y,jsonMsg.button);
+			vncClient.sendPointerEvent(jsonMsg.x,jsonMsg.y,...jsonMsg.button.reverse());
 		}
 		//press keys
-		if(jsonMsg.keydown!=null)r.keyEvent(jsonMsg.keydown,1);
+		if(jsonMsg.keydown!=null)vncClient.sendKeyEvent(jsonMsg.keydown,1);
 		//release keys
-		if(jsonMsg.keyup!=null)r.keyEvent(jsonMsg.keyup,0);
-
-		//minecraft lol
-		lockpos=[canvas.width/2,canvas.height/2];
+		if(jsonMsg.keyup!=null)vncClient.sendKeyEvent(jsonMsg.keyup,0);
 	});
 
 	//user stuff
@@ -376,34 +403,14 @@ wss.on('connection', function (ws, req) {
 
 console.log('Listening on port:', wsPort);
 
-const rtAudio = new RtAudio(RtAudioApi.WINDOWS_WASAPI);
-rtAudio.openStream(null,
-	{ deviceId: rtAudio.getDevices().map(e=>e.name.trim()).indexOf(/*"CABLE Output (VB-Audio Virtual Cable)"*/"Virtual Audio Input (VB-Audio Virtual Cable)"),//rtAudio.getDefaultOutputDevice(),
-	  nChannels: 2,
-	  firstChannel: 0
-	},
-	RtAudioFormat.RTAUDIO_SINT16,
-	22050,
-	250*22050/1000,//50*22050/1000,// Frame size is 50ms
-	"webvm",
-	pcm => {
-		if(!pcm.every(p=>p==0x00))wss.clients.forEach(c=>{
-			//c.send(pcm,{binary:true});
-		});
-	},null,RtAudioStreamFlags.RTAUDIO_MINIMIZE_LATENCY,e=>{if(!rtAudio.isStreamRunning())rtAudio.start();}
-);
-
-rtAudio.start();
-
-
 const pixelmatch = require('pixelmatch');
 
 function checkIfCanvasNeedsToBeUpdated(){
 	if(cachedliteraldata.length==0){
 		cachedliteraldata=ctx.getImageData(0,0,canvas.width,canvas.height).data;
-		return [false,null];
+		return [true,null];
 	}
-	var diff=cropctx.createImageData(canvas.width,canvas.height);
+	var diff=ctx.createImageData(canvas.width,canvas.height);
 	var canvasdata=ctx.getImageData(0,0,canvas.width,canvas.height).data;
 	var res=pixelmatch(cachedliteraldata,canvasdata,diff.data,canvas.width,canvas.height,{threshold:0.1})>50;
 	if(res)cachedliteraldata=canvasdata;
@@ -499,6 +506,7 @@ readline.on('line',cmd=>{
 	  break;
 	case "quit":
 	  console.log("Exiting...");
+	  qemuproc.kill('SIGINT');
 	  process.exit();
 	  break;
 	default:
