@@ -332,10 +332,13 @@ wss.on('connection', function (ws, req) {
 
 		if(jsonMsg.x!=null&&jsonMsg.y!=null){
 			if(jsonMsg.lock){
-				var tmplp=[jsonMsg.x,jsonMsg.y];
-				jsonMsg.x+=0x7FFF-lockpos[0];
-				jsonMsg.y+=0x7FFF-lockpos[1];
-				lockpos=tmplp;
+				//var tmplp=[jsonMsg.x,jsonMsg.y];
+				//jsonMsg.x+=0x7FFF-lockpos[0];
+				//jsonMsg.y+=0x7FFF-lockpos[1];
+				//lockpos=tmplp;
+				jsonMsg.x+=lockpos[0];
+				jsonMsg.y+=lockpos[1];
+				//lockpos=[jsonMsg.x,jsonMsg.y];
 			}else{
 				jsonMsg.x=Math.min((+jsonMsg.x)||-1,r.width);
 				jsonMsg.y=Math.min((+jsonMsg.y)||-1,r.height);
@@ -355,7 +358,7 @@ wss.on('connection', function (ws, req) {
 		if(jsonMsg.keyup!=null)r.keyEvent(jsonMsg.keyup,0);
 
 		//minecraft lol
-		//lockpos=[canvas.width/2,canvas.height/2];
+		lockpos=[canvas.width/2,canvas.height/2];
 	});
 
 	//user stuff
