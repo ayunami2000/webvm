@@ -131,7 +131,8 @@
         chatsound=document.querySelector("audio"),
         muted=false,
         mutedchat=false,
-        turnmode=0;
+        turnmode=0,
+        cachelockmobile=false;
 
     window.requestPointerLock=window.requestPointerLock||window.mozRequestPointerLock;
     document.exitPointerLock=document.exitPointerLock||document.mozExitPointerLock;
@@ -181,6 +182,7 @@
     }
 
     function pointerlock(mobile){
+        cachelockmobile=mobile;
         if(mobile){
           mlock=!mlock;
           plockbtn.innerText="pointer "+(mlock?"un":"")+"lock";
@@ -323,7 +325,7 @@
     var socket = new WebSocket('ws'+window.location.origin.slice(4));
     socket.binaryType = 'arraybuffer';
     socket.onopen=()=>{
-      var mousebtn=0,
+      var mousebtn=[false,false,false,false,false,false,false,false],
           x=-1,
           y=-1,
           sendMouseMovement=false,
@@ -367,6 +369,8 @@
                 }else{
                   turntimer=+e.data.slice(1);
                 }
+              }else if(e.data.startsWith("@")){
+                if((e.data=="@abs"&&mlock)||(e.data=="@rel"&&!mlock))pointerlock(cachelockmobile);
               }else if(e.data.startsWith("`")||e.data.startsWith("^")){
               //chat :D
               if(e.data.startsWith("`")&&!mutedchat){
@@ -400,14 +404,14 @@
         touchrel=[e.clientX,e.clientY];
         x=mousepos[0];
         y=mousepos[1];
-        if(turnmode==1)socket.send(JSON.stringify({x:x,y:y,button:mousebtn,keydown:null,keyup:null,lock:mlock}));
+        if(turnmode==1)socket.send(JSON.stringify({x:x,y:y,button:mousebtn,keydown:null,keyup:null,lock:mlock,mm:false}));
       };
       vm.ontouchmove=function(e){
         e.preventDefault();
         if(touchtimer==1000&&touchbtn!=1){
-          if(touchbtn==2)mousebtn&=~(1<<2);
+          if(touchbtn==2)mousebtn[2]=false;
           touchbtn=1;
-          mousebtn|=1<<0;
+          mousebtn[1]=true;
         }else{
           touchtimer=-1;
         }
@@ -426,19 +430,19 @@
         if(e.touches.length==0){
           if(touchtimer==1000){
             if(touchbtn!=2){
-              if(touchbtn==1)mousebtn&=~(1<<0);
+              if(touchbtn==1)mousebtn[0]=false;
               touchbtn=2;
-              mousebtn|=1<<2;
+              mousebtn[2]=true;
             }
           }else if(touchtimer!=-1){
             if(touchbtn!=1){
-              if(touchbtn==2)mousebtn&=~(1<<2);
+              if(touchbtn==2)mousebtn[2]=false;
               touchbtn=1;
-              mousebtn|=1<<0;
+              mousebtn[0]=true;
             }
           }else{
-            if(touchbtn==1)mousebtn&=~(1<<0);
-            if(touchbtn==2)mousebtn&=~(1<<2);
+            if(touchbtn==1)mousebtn[0]=false;
+            if(touchbtn==2)mousebtn[2]=false;
             touchbtn=0;
           }
           touchtimer=-1;
@@ -450,31 +454,31 @@
         touchrel=[e.clientX,e.clientY];
         x=mousepos[0];
         y=mousepos[1];
-        if(turnmode==1)socket.send(JSON.stringify({x:x,y:y,button:mousebtn,keydown:null,keyup:null,lock:mlock}));
+        if(turnmode==1)socket.send(JSON.stringify({x:x,y:y,button:mousebtn,keydown:null,keyup:null,lock:mlock,mm:false}));
         if(e.touches.length==0&&touchbtn!=0){
-          if(touchbtn==1)mousebtn&=~(1<<0);
-          if(touchbtn==2)mousebtn&=~(1<<2);
+          if(touchbtn==1)mousebtn[0]=false;
+          if(touchbtn==2)mousebtn[2]=false;
           touchbtn=0;
-          if(turnmode==1)socket.send(JSON.stringify({x:x,y:y,button:mousebtn,keydown:null,keyup:null,lock:mlock}));
+          if(turnmode==1)socket.send(JSON.stringify({x:x,y:y,button:mousebtn,keydown:null,keyup:null,lock:mlock,mm:false}));
         }
       };
       vm.onmousedown=function(e){
         e.preventDefault();
-        mousebtn|=1<<(e.which-1);
+        mousebtn[e.which-1]=true;
         if(turnmode!=1)return;
         var mousepos=mlock?[e.movementX,e.movementY]:calcMousePos(e);
         x=mousepos[0];
         y=mousepos[1];
-        socket.send(JSON.stringify({x:x,y:y,button:mousebtn,keydown:null,keyup:null,lock:mlock}));
+        socket.send(JSON.stringify({x:x,y:y,button:mousebtn,keydown:null,keyup:null,lock:mlock,mm:false}));
       };
       vm.onmouseup=function(e){
         e.preventDefault();
-        mousebtn&=~(1<<(e.which-1));
+        mousebtn[e.which-1]=false;
         if(turnmode!=1)return turn(1);
         var mousepos=mlock?[e.movementX,e.movementY]:calcMousePos(e);
         x=mousepos[0];
         y=mousepos[1];
-        socket.send(JSON.stringify({x:x,y:y,button:mousebtn,keydown:null,keyup:null,lock:mlock}));
+        socket.send(JSON.stringify({x:x,y:y,button:mousebtn,keydown:null,keyup:null,lock:mlock,mm:false}));
       };
       vm.onmousemove=function(e){
         e.preventDefault();
@@ -486,11 +490,11 @@
       };
       vm.onkeydown=typebox.onkeydown=function(e){
         e.preventDefault();
-        if(turnmode==1&&!e.repeat)socket.send(JSON.stringify({x:null,y:null,button:mousebtn,keydown:toRfbKeycode(e.which,e.shiftKey),keyup:null,lock:mlock}));
+        if(turnmode==1&&!e.repeat)socket.send(JSON.stringify({x:null,y:null,button:mousebtn,keydown:toRfbKeycode(e.which,e.shiftKey),keyup:null,lock:mlock,mm:false}));
       };
       vm.onkeyup=typebox.onkeyup=function(e){
         e.preventDefault();
-        if(turnmode==1)socket.send(JSON.stringify({x:null,y:null,button:mousebtn,keydown:null,keyup:toRfbKeycode(e.which,e.shiftKey),lock:mlock}));
+        if(turnmode==1)socket.send(JSON.stringify({x:null,y:null,button:mousebtn,keydown:null,keyup:toRfbKeycode(e.which,e.shiftKey),lock:mlock,mm:false}));
       };
       setInterval(()=>{
         if(msgtosend!=""){
@@ -499,7 +503,7 @@
         }
         if(sendMouseMovement){
           sendMouseMovement=false;
-          socket.send(JSON.stringify({x:x,y:y,button:mousebtn,keydown:null,keyup:null,lock:mlock}));
+          socket.send(JSON.stringify({x:x,y:y,button:mousebtn,keydown:null,keyup:null,lock:mlock,mm:true}));
         }
         chatmsg.placeholder="type something as "+username+" (/help)"+((turnmode>0)?" (turn: "+turntimer+"s)":"");
         if(touchtimer>-1&&touchtimer<1000)touchtimer+=1000/fps;
