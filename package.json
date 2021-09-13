@@ -12,12 +12,11 @@
     "start": "node server.js"
   },
   "dependencies": {
-    "audify": "^1.6.3",
     "canvas": "^2.8.0",
     "pixelmatch": "^5.2.1",
     "telnetlib": "^1.0.1",
     "vnc-rfb-client": "git+https://github.com/ayunami2000/vnc-rfb-client.git",
-    "ws": "^8.2.1"
+    "ws": "^8.2.2"
   },
   "engines": {
     "node": "14.x"
