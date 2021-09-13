@@ -76,8 +76,11 @@
       #lockfs{
         bottom:11.25em;
       }
-      #mute{
+      #togglevideo{
         bottom:12.75em;
+      }
+      #mute{
+        bottom:14.25em;
       }
       @media screen and (orientation: portrait){
         canvas{
@@ -108,6 +111,7 @@
     <button id="turn" onclick="turn()">take turn</button>
     <button id="fullscreen" onclick="fs()">fullscreen</button>
     <button id="lockfs" onclick="lockfs()">lock+fs</button>
+    <button id="togglevideo" onclick="togglevideo()">toggle video</button>
     <button id="mute" onclick="mute()">mute vm</button>
     <!--removing attribution breaks license terms-->
     <textarea placeholder="using webvm by ayunami2000 (mobile users type here)" oninput="this.innerText='';"></textarea>
@@ -171,8 +175,13 @@
         }
     }
 
+    function togglevideo(){
+    	socket.send("`/togglevideo");
+    }
+
     function mute(){
         muted=!muted;
+        socket.send("`/toggleaudio");
         mutebtn.innerText=(muted?"un":"")+"mute vm";
     }
 
