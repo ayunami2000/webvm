@@ -18,7 +18,7 @@ D:/qemu/qemu-system-x86_64.exe -L D:/qemu -qmp tcp:127.0.0.1:1984,server,nowait 
 
 //remove -usbdevice tablet for pointer lock
 
-var qemuproc=exec('D:/qemu/qemu-system-x86_64.exe -L D:/qemu -qmp tcp:127.0.0.1:1984,server,nowait -accel hax -vnc :0 -device intel-hda -device hda-output -boot d -cdrom "D:/VirtualBox VMs/webconverger.iso" -m 3072 -net nic,model=virtio -net user -rtc base=localtime,clock=host -smp cores=4,threads=4 -usbdevice tablet -vga vmware'),
+var qemuproc=exec('D:/qemu/qemu-system-x86_64.exe -L D:/qemu -qmp tcp:127.0.0.1:1984,server,nowait -accel hax -device intel-hda -device hda-output -vnc :0 -boot d -cdrom "D:/VirtualBox VMs/more ISOs/geexbox-3.1-x86_64.iso" -m 2048 -net nic,model=e1000 -net user -rtc base=localtime,clock=host -smp cores=4,threads=4 -usbdevice tablet -vga vmware'),
 	telqmp=null,
 	wsPort = 80,
 	listeners = {},
@@ -28,6 +28,8 @@ var qemuproc=exec('D:/qemu/qemu-system-x86_64.exe -L D:/qemu -qmp tcp:127.0.0.1:
 	unames={},
 	wsc={},
 	wsip={},
+	wsmuteaudio=[],
+	wsnovideo=[],
 	recentips=[],
 	turns=[],
 	cachedscreen="",
@@ -120,9 +122,11 @@ const vncConnectOpts={host:'127.0.0.1',port:5900};
 vncClient.connect(vncConnectOpts);
 
 vncClient.on('audioStream',buffer=>{
-	if(!buffer.every(p=>p==0x00))wss.clients.forEach(c=>{
-		c.send(buffer,{binary:true});
-	});
+	if(!buffer.every(p=>p==0x00)){
+		for(var c in wsc){
+			if(!wsmuteaudio.includes(c))wsc[c].send(buffer,{binary:true});
+		}
+	}
 });
 vncClient.on('connectTimeout',()=>{
 	if(vncWaitingToConnect)return;
@@ -163,7 +167,9 @@ vncClient.on('frameUpdated',fb=>{
 	if(check[0]){
 		cachedscreen=canvas.toBuffer("image/jpeg",imgq).toString("base64");//is always 1frame behind but thats ok
 		if(check[1]==null){
-			wss.clients.forEach(c=>c.send(JSON.stringify([0,0,cachedscreen,vncClient.clientWidth,vncClient.clientHeight])));
+			for(var c in wsc){
+				if(!wsnovideo.includes(c))wsc[c].send(JSON.stringify([0,0,cachedscreen,vncClient.clientWidth,vncClient.clientHeight]));
+			}
 		}else{
 			ctx.globalCompositeOperation="source-over";
 			var tmpdata=ctx.getImageData(0,0,canvas.width,canvas.height);
@@ -175,7 +181,9 @@ vncClient.on('frameUpdated',fb=>{
 			canvas.height-=sides[0]+sides[2];
 			ctx.putImageData(tmpdata,-sides[3],-sides[0]);
 			var cropbuffer=canvas.toBuffer("image/jpeg",imgq);
-			wss.clients.forEach(c=>c.send(JSON.stringify([sides[3],sides[0],cropbuffer.toString("base64"),vncClient.clientWidth,vncClient.clientHeight])));
+			for(var c in wsc){
+				if(!wsnovideo.includes(c))wsc[c].send(JSON.stringify([sides[3],sides[0],cropbuffer.toString("base64"),vncClient.clientWidth,vncClient.clientHeight]));
+			}
 		}
 	}
 });
@@ -304,13 +312,29 @@ wss.on('connection', function (ws, req) {
 				var args=message.slice(1).split(" ");
 				switch(args[0]){
 					case "help":
-						ws.send("^Commands: /help /list /username /nick /turns");
+						ws.send("^Commands: /help /list /username /nick /turns /toggleaudio /togglevideo");
 						break;
 					case "list":
 						ws.send("^Users: "+Object.values(unames).join(" "));
 						break;
 					case "turns":
 						ws.send("^Turns: "+turns.map(x=>unames[x]).join(", "));
+						break;
+					case "toggleaudio":
+						if(wsmuteaudio.includes(connectionId)){
+							wsmuteaudio.splice(wsmuteaudio.indexOf(connectionId),1);
+						}else{
+							wsmuteaudio.push(connectionId);
+						}
+						ws.send("^Toggled audio.");
+						break;
+					case "togglevideo":
+						if(wsnovideo.includes(connectionId)){
+							wsnovideo.splice(wsnovideo.indexOf(connectionId),1);
+						}else{
+							wsnovideo.push(connectionId);
+						}
+						ws.send("^Toggled video.");
 						break;
 					case "username":
 					case "nick":
@@ -397,6 +421,8 @@ wss.on('connection', function (ws, req) {
 	  delete wsc[connectionId];
 	  delete wsip[connectionId];
 	  if(turns.includes(connectionId))turns.splice(turns.indexOf(connectionId),1);
+	  if(wsmuteaudio.includes(connectionId))wsmuteaudio.splice(wsmuteaudio.indexOf(connectionId),1);
+	  if(wsnovideo.includes(connectionId))wsnovideo.splice(wsnovideo.indexOf(connectionId),1);
 	});
 });
 
