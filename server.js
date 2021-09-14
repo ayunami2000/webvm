@@ -204,7 +204,7 @@ var httpServer = http.createServer((req,res)=>{
   }
 }).listen(wsPort);
 
-wss = new WebSocketServer({ server: httpServer });
+wss = new WebSocketServer({ server: httpServer, perMessageDeflate: true });
 
 function updchat(msg,silent){
 	chatlog.push(msg);
