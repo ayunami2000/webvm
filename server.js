@@ -126,7 +126,6 @@ function reconnectVnc(){
 	if(vncWaitingToConnect)return;
 	vncWaitingToConnect=true;
 	vncClient.disconnect();
-	wss.clients.forEach(c=>c.send("`VM Disconnected. Reconnecting..."));
 	setTimeout(()=>{
 	  vncWaitingToConnect=false;
 	  vncClient.connect(vncConnectOpts);
