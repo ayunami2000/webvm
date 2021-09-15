@@ -442,7 +442,7 @@ function checkIfCanvasNeedsToBeUpdated(){
 	return [res,diff];
 }
 
-var commands="help quit list ips username kick endturn turns reset";
+var commands="help quit list ips username kick endturn turns reset reconnect";
 
 var readline=require("readline").createInterface({input:process.stdin,output:process.stdout,prompt:"Command: ",completer:function(line){
   var completions=commands.split(" ");
@@ -528,6 +528,10 @@ readline.on('line',cmd=>{
 	case "reset":
 	  console.log("Resetting VM...");
 	  telqmp.write('{"execute":"system_reset"}');
+	  break;
+	case "reconnect":
+	  console.log("Reconnecting VNC...");
+	  vncClient.disconnect();
 	  break;
 	case "quit":
 	  console.log("Exiting...");
