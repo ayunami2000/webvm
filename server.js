@@ -41,7 +41,8 @@ var qemuproc=exec('D:/qemu/qemu-system-x86_64.exe -L D:/qemu -qmp tcp:127.0.0.1:
 	imgq={quality:0.25,progressive:true,chromaSubsampling:true},
 	updloop=-1,
 	oldsize=[],
-	wss=null;
+	wss=null,
+	timeout=0;
 
 setTimeout(()=>{
 	telqmp=telnetlib.createConnection({host:"127.0.0.1",port:1984},()=>{
@@ -121,6 +122,27 @@ const vncClient=new VncClient(vncOpts);
 const vncConnectOpts={host:'127.0.0.1',port:5900};
 vncClient.connect(vncConnectOpts);
 
+function reconnectVnc(){
+	if(vncWaitingToConnect)break;
+	vncWaitingToConnect=true;
+	vncClient.disconnect();
+	wss.clients.forEach(c=>c.send("`VM Disconnected. Reconnecting..."));
+	setTimeout(()=>{
+	  vncWaitingToConnect=false;
+	  vncClient.connect(vncConnectOpts);
+	},250);
+}
+
+setInterval(()=>{
+	timeout++;
+	if(timeout>=8){
+		//8s nothing
+		timeout=0;
+		console.log("VNC timeout, reconnecting...");
+		reconnectVnc();
+	}
+},1000);
+
 vncClient.on('audioStream',buffer=>{
 	if(!buffer.every(p=>p==0x00)){
 		for(var c in wsc){
@@ -149,6 +171,7 @@ vncClient.on('closed',()=>{
 	},8000);
 });
 vncClient.on('frameUpdated',fb=>{
+	timeout=0;
 	if(vncClient.clientWidth!=oldsize[0]||vncClient.clientHeight!=oldsize[1])cachedliteraldata=[];
 	oldsize=[vncClient.clientWidth,vncClient.clientHeight];
 	canvas.width=vncClient.clientWidth;
@@ -531,7 +554,7 @@ readline.on('line',cmd=>{
 	  break;
 	case "reconnect":
 	  console.log("Reconnecting VNC...");
-	  vncClient.disconnect();
+	  reconnectVnc();
 	  break;
 	case "quit":
 	  console.log("Exiting...");
