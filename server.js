@@ -123,7 +123,7 @@ const vncConnectOpts={host:'127.0.0.1',port:5900};
 vncClient.connect(vncConnectOpts);
 
 function reconnectVnc(){
-	if(vncWaitingToConnect)break;
+	if(vncWaitingToConnect)return;
 	vncWaitingToConnect=true;
 	vncClient.disconnect();
 	wss.clients.forEach(c=>c.send("`VM Disconnected. Reconnecting..."));
