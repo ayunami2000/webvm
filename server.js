@@ -274,7 +274,7 @@ setInterval(()=>{
 },1000/fps);
 
 wss.on('connection', function (ws, req) {
-	var headerip=req.headers['x-forwarded-for']||req.headers['x_forwarded_for']||req.connection.remoteAddress;
+	var headerip=req.headers['x-forwarded-for']||req.connection.remoteAddress;
 	headerip=headerip.split(",",2)[0];
 	if(recentips.includes(headerip)){
 		ws.send("`You are ratelimited!");
